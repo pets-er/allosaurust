@@ -7,7 +7,7 @@ use bls12_381_plus::{G1Projective, Scalar};
 use group::{GroupEncoding};
 use merlin::Transcript;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, hash_map::RandomState};
 use crate::{
     utils::{UserID, PublicKeys, AccParams},
 };
@@ -149,6 +149,23 @@ impl Server {
         Some((acc_witness, signature))
     }
 
+    // Generates random uid for benchmarking and passes on to regular register user 
+    pub fn register_user_no_id(&mut self, params: &AccParams, witu: (&Element, &Element, &G1Projective))  -> Option<(MembershipWitness, G1Projective, usize, Accumulator)> {
+        let y = UserID::random();
+        self.register_user(params, y, witu)
+    }
+
+    pub fn register_user(&mut self, params: &AccParams, y: UserID, witu: (&Element, &Element, &G1Projective))  -> Option<(MembershipWitness, G1Projective, usize, Accumulator)> {
+        self.add(y);
+        match self.wit(params, &y, witu.0,witu.1,witu.2){
+            None => return None,
+            Some((acc_witness, signature)) => {
+                let epoch = self.get_epoch();
+                let acc = self.get_accumulator();
+                Some((acc_witness, signature, epoch, acc))
+            }
+        }
+    }
     // Given shares from a user, returns the array of (d,W) which can each be used as 
     // C <- (C - W)*(1/d) 
     // for an update

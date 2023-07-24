@@ -77,6 +77,10 @@ impl User {
     pub fn get_id(&self) -> UserID {
         self.id
     }
+    // First local part of creating a new witness for the user
+    // The user generates a random new secret key, 
+    // creates a ZKPoK of this key, and asks the server given
+    // as an argument for a new witness and long-term signature
     pub fn wit_u(&mut self, params: &AccParams) -> (Element, Scalar, G1Projective, SecretKey) {
         // If this is deterministic this line needs to be changed
         let secret_key = SecretKey::new(Some(b"USER_KEY"));
@@ -91,26 +95,40 @@ impl User {
         let response = k.0 - challenge.0 * secret_key.0;
 	(challenge, response, user_pub_key, secret_key) 
     }
+    // reg_response: witness, signature, epoch, accumulator
+    pub fn set_wit(&mut self, secret_key: SecretKey, reg_response: (MembershipWitness, G1Projective, usize, Accumulator)) {
+        self.witness = Some(Witness {
+            secret_key: secret_key,
+            witness: reg_response.0,
+            signature: reg_response.1,
+        });
+        self.epoch = reg_response.2;
+        self.accumulator = reg_response.3;
+        }
+
+    
     // For local benchmarking, needs server object!
-    // Creates a new witness for the user
-    // The user generates a random new secret key, 
-    // creates a ZKPoK of this key, and asks the server given
-    // as an argument for a new witness and long-term signature
-    pub fn wit(&mut self, params: &AccParams, server: &Server) {
+    pub fn wit(&mut self, params: &AccParams, server:  &mut Server) {
         let (challenge, response, user_pub_key, key) = self.wit_u(params);
         // Send Schnorr proof and ID to server
-        match server.wit(params, &self.id, &challenge, &Element(response), &user_pub_key) {
-            Some(wits) => {
-                self.witness = Some(Witness {
-                    secret_key: key,
-                    witness: wits.0,
-                    signature: wits.1,
-                });
-                self.epoch = server.get_epoch();
-                self.accumulator = server.get_accumulator();
-            }
+        match server.register_user_no_id(params, (&challenge, &Element(response), &user_pub_key)) {
+            Some(reg_response) => {
+                self.set_wit(key, reg_response);
+            }   
             None => {}
         }
+  //      match server.wit(params, &self.id, &challenge, &Element(response), &user_pub_key) {
+    //        Some(wits) => {
+      //          self.witness = Some(Witness {
+        //            secret_key: key,
+          //         witness: wits.0,
+           //         signature: wits.1,
+            //    });
+              //  self.epoch = server.get_epoch();
+                //self.accumulator = server.get_accumulator();
+            //}
+       //     None => {}
+       // }
     }
     
 
@@ -240,6 +258,7 @@ impl User {
         Ok(new_witness)
     }
 
+    // TODO implement without server object dependency 
     // Updates to the latest available epoch, from a set of servers
     pub fn update(&mut self, servers: &[Server], threshold: usize) -> Result<(), &'static str> {
         
@@ -281,7 +300,8 @@ impl User {
             }, Err(e) => {return Err(e);}
         }
     }
-
+     
+     
     // Constructs a membership proof as a byte string
     pub fn make_membership_proof(
         &self,

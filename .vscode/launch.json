@@ -1,0 +1,39 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Build",
+            "cargo": {
+                "args": [
+                    "rustc",
+                    "--package=allosaur",
+                    "--manifest-path=Cargo.toml"
+                ],
+                "filter": {
+                    "kind": "bin"
+                }
+            },
+            "args": []
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug benchmark 'updates'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bench=updates",
+                ],
+                "filter": {
+                    "name": "updates",
+                    "kind": "bench"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
